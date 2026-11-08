@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Kalendarz bioinformatyki</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: nagłówek z postępem, potem siatka miesięcy (dni w kolorach etapów) i panel wybranego tygodnia obok/pod spodem */
+:root{
+  --bg:#f6f7f5; --surface:#ffffff; --fg:#1b2420; --muted:#5d6b64; --line:#dde3df; --accent:#0f6e5c;
+  --p-bio:#d9ece4; --p-bio-ink:#155a45;
+  --p-break:#ececec; --p-break-ink:#666;
+  --p-alg:#dfe6f7; --p-alg-ink:#2a4791;
+  --p-data:#f6e6d3; --p-data-ink:#8a4b12;
+  --p-evo:#ece0f3; --p-evo-ink:#6a2f86;
+  --p-rev:#f3efcf; --p-rev-ink:#6f6210;
+  --p-int:#f7dcdc; --p-int-ink:#a02c2c;
+  --done:#0f6e5c;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121715; --surface:#1a211e; --fg:#e6ece9; --muted:#9aa8a1; --line:#2c3632; --accent:#5cc8ad;
+  --p-bio:#1d3a30; --p-bio-ink:#8fdcc0; --p-break:#2a2d2c; --p-break-ink:#a5a8a7;
+  --p-alg:#222d4a; --p-alg-ink:#a9bdf2; --p-data:#3d2c1a; --p-data-ink:#f0c08c;
+  --p-evo:#33233d; --p-evo-ink:#d6b0ea; --p-rev:#36321a; --p-rev-ink:#e3d47a;
+  --p-int:#3e2222; --p-int-ink:#f2a6a6; --done:#5cc8ad; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121715; --surface:#1a211e; --fg:#e6ece9; --muted:#9aa8a1; --line:#2c3632; --accent:#5cc8ad;
+  --p-bio:#1d3a30; --p-bio-ink:#8fdcc0; --p-break:#2a2d2c; --p-break-ink:#a5a8a7;
+  --p-alg:#222d4a; --p-alg-ink:#a9bdf2; --p-data:#3d2c1a; --p-data-ink:#f0c08c;
+  --p-evo:#33233d; --p-evo-ink:#d6b0ea; --p-rev:#36321a; --p-rev-ink:#e3d47a;
+  --p-int:#3e2222; --p-int-ink:#f2a6a6; --done:#5cc8ad; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-block:28px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{display:flex;flex-wrap:wrap;gap:16px 32px;align-items:end;justify-content:space-between;margin-bottom:20px}
+h1{font-family:var(--display);font-weight:800;font-size:clamp(28px,4vw,40px);line-height:1.1;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:6px 0 0}
+.progress{min-width:240px;flex:0 1 340px}
+.progress .row{display:flex;justify-content:space-between;font-size:14px;color:var(--muted)}
+.progress .row b{font-family:var(--mono);color:var(--fg);font-weight:500}
+.bar{height:10px;border-radius:5px;background:var(--line);overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 20px;padding:0;list-style:none}
+.legend li{font-size:13px;padding:3px 10px;border-radius:99px;font-weight:600}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:24px;align-items:start}
+@media (max-width:900px){.layout{grid-template-columns:minmax(0,1fr)}.panel{position:static!important;order:-1}}
+.months{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:18px}
+.month h3{font-family:var(--display);font-weight:600;font-size:17px;margin:0 0 6px;text-transform:capitalize}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.dow{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:center;padding-bottom:2px}
+.day{appearance:none;border:0;font:inherit;font-family:var(--mono);font-size:12px;aspect-ratio:1;border-radius:6px;background:transparent;color:var(--muted);cursor:default;position:relative;padding:0}
+.day.in{cursor:pointer;color:var(--ink)}
+.day.in:hover{outline:2px solid var(--ink);outline-offset:-2px}
+.day.sel{outline:2px solid var(--fg);outline-offset:-2px}
+.day.today::after{content:"";position:absolute;left:50%;bottom:3px;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:var(--fg)}
+.day.done{text-decoration:line-through;opacity:.55}
+.day:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.panel{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px}
+.wk-eyebrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px}
+.chip{font-weight:600;padding:2px 9px;border-radius:99px}
+.wk-dates{color:var(--muted);font-family:var(--mono);font-size:12px}
+.panel h2{font-family:var(--display);font-weight:600;font-size:22px;line-height:1.2;margin:10px 0 14px;text-wrap:balance}
+dl{margin:0;display:grid;gap:12px}
+dt{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+dd{margin:2px 0 0}
+dd a{color:var(--accent)}
+.check{display:flex;gap:10px;align-items:center;margin-top:18px;padding-top:16px;border-top:1px solid var(--line);font-weight:600;cursor:pointer}
+.check input{width:20px;height:20px;accent-color:var(--done)}
+.nav{display:flex;gap:8px;margin-top:14px}
+.nav button{flex:1;font:inherit;font-size:14px;padding:8px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--fg);cursor:pointer}
+.nav button:hover{border-color:var(--fg)}
+.nav button:focus-visible,.check input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.save{font-size:12px;color:var(--muted);margin-top:8px;min-height:1em}
+.bio{--ph:var(--p-bio);--ink:var(--p-bio-ink)} .break{--ph:var(--p-break);--ink:var(--p-break-ink)}
+.alg{--ph:var(--p-alg);--ink:var(--p-alg-ink)} .data{--ph:var(--p-data);--ink:var(--p-data-ink)}
+.evo{--ph:var(--p-evo);--ink:var(--p-evo-ink)} .rev{--ph:var(--p-rev);--ink:var(--p-rev-ink)}
+.int{--ph:var(--p-int);--ink:var(--p-int-ink)}
+.legend li,.chip,.day.in{background:var(--ph);color:var(--ink)}
+.bar2{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center;margin:0 0 20px}
+.bar2 .legend{margin:0}
+.views{display:inline-flex;border:1px solid var(--line);border-radius:10px;padding:3px;background:var(--surface)}
+.views button{font:inherit;font-size:14px;font-weight:600;border:0;background:transparent;color:var(--muted);padding:6px 14px;border-radius:7px;cursor:pointer}
+.views button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.views button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tablebox{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+table{border-collapse:collapse;width:100%;min-width:760px;font-size:15px}
+th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--surface)}
+td.num{font-family:var(--mono);font-size:13px;white-space:nowrap;font-variant-numeric:tabular-nums}
+td.dates{white-space:nowrap;color:var(--muted);font-size:14px}
+tr.wk{cursor:pointer}
+tr.wk:hover td{background:color-mix(in srgb,var(--ph) 45%,transparent)}
+tr.wk td:first-child{border-left:4px solid var(--ph)}
+tr.wk.done td:not(.ck){opacity:.5}
+tr.wk.done .topic{text-decoration:line-through}
+tr.now td{background:color-mix(in srgb,var(--ph) 60%,transparent)}
+td.ck input{width:18px;height:18px;accent-color:var(--done)}
+td a{color:var(--accent)}
+.syncbtn{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;padding:5px 10px;cursor:pointer;margin-top:10px}
+.syncbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.syncpanel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:0 0 20px;max-width:640px}
+.syncpanel h2{font-family:var(--display);font-weight:600;font-size:19px;margin:0 0 8px}
+.syncpanel ol{margin:0 0 12px;padding-left:20px;color:var(--muted);font-size:14px}
+.syncpanel input[type=password]{width:100%;font:inherit;font-family:var(--mono);font-size:13px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
+.syncpanel .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.syncpanel button{font:inherit;font-size:14px;padding:7px 14px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--fg);cursor:pointer}
+.syncpanel button.primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.syncpanel a{color:var(--accent)}
+.syncstate{font-size:12px;color:var(--muted);margin-top:4px}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style>
+<style>body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Bioinformatyka II st. UAM: kalendarz nauki</h1>
+      <p class="sub">37 tygodni, 6 h tygodniowo, od 9 listopada 2026 do rozmowy w lipcu 2027. Kliknij dzień, żeby zobaczyć swój tydzień.</p>
+    </div>
+    <div class="progress" aria-live="polite">
+      <div class="row"><span>Zaliczone tygodnie</span><b id="pcount">0 / 37</b></div>
+      <div class="bar"><i id="pbar"></i></div>
+      <button type="button" class="syncbtn" id="syncbtn">Synchronizacja</button>
+      <div class="syncstate" id="syncstate"></div>
+    </div>
+  </header>
+  <section class="syncpanel" id="syncpanel" hidden>
+    <h2>Synchronizacja przez GitHub</h2>
+    <p>Postęp zapisuje się w pliku <code>progress.json</code> w Twoim repozytorium, więc widzisz go na każdym urządzeniu. Klucz wklejasz raz na każdym urządzeniu; zostaje tylko w tej przeglądarce.</p>
+    <ol>
+      <li>Otwórz <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">tworzenie klucza na GitHubie</a>.</li>
+      <li>Nazwa: np. „plan nauki”. Termin ważności: do sierpnia 2027 (Custom).</li>
+      <li>Repository access: <b>Only select repositories</b> i wybierz repozytorium z tym planem.</li>
+      <li>Permissions → Repository permissions → <b>Contents: Read and write</b>.</li>
+      <li>Kliknij „Generate token”, skopiuj go i wklej poniżej.</li>
+    </ol>
+    <label for="tok">Klucz dostępu (token)</label>
+    <input type="password" id="tok" autocomplete="off" placeholder="github_pat_…">
+    <div class="btns"><button type="button" class="primary" id="tok-save">Połącz</button><button type="button" id="tok-del">Odłącz to urządzenie</button><button type="button" id="tok-close">Zamknij</button></div>
+    <div class="syncstate" id="tokmsg"></div>
+  </section>
+  <div class="bar2">
+    <ul class="legend" id="legend"></ul>
+    <div class="views" role="group" aria-label="Widok"><button type="button" id="v-cal" aria-pressed="true">Kalendarz</button><button type="button" id="v-tab" aria-pressed="false">Tabela</button></div>
+  </div>
+  <div class="tablebox" id="tableview" hidden><table><thead><tr><th>Tydz.</th><th>Daty</th><th>Etap</th><th>Temat (4 h)</th><th>Czytam</th><th>Informatyka (2 h)</th><th>Zaliczone</th></tr></thead><tbody id="tbody"></tbody></table></div>
+  <div class="layout" id="calview">
+    <div class="months" id="months"></div>
+    <aside class="panel" id="panel" aria-live="polite"></aside>
+  </div>
+</div>
+
+<script>
+const PH={bio:"Biologia",break:"Przerwa",alg:"Algorytmy",data:"Genom i dane",evo:"Ewolucja",rev:"Powtórka",int:"Rozmowy"};
+const W=[
+["bio","Budowa komórki, organella, błona i transport","Campbell, Jóźwiak","Missing Semester: praca w terminalu"],
+["bio","Cytoszkielet, sygnalizacja, cykl komórkowy","Campbell, Jóźwiak","Missing Semester"],
+["bio","DNA, RNA, chromosomy, replikacja","Campbell","Shell for Genomics"],
+["bio","Transkrypcja i obróbka RNA","Campbell","Shell for Genomics: grep na plikach FASTA"],
+["bio","Translacja, kod genetyczny, mutacje","Campbell","Shell for Genomics: łączenie poleceń"],
+["bio","Regulacja ekspresji genów","Campbell","Powtórka Linuxa"],
+["break","Przerwa świąteczna: 2 h powtórki","Fiszki w Anki","–"],
+["break","Przerwa świąteczna: 2 h powtórki","Fiszki w Anki","–"],
+["bio","Aminokwasy i struktura białek","Stryer","Kaggle Python"],
+["bio","Enzymy","Stryer","Kaggle Python"],
+["bio","Techniki: PCR, elektroforeza, sekwencjonowanie, CRISPR","Stryer (Exploring Genes)","Biopython: czytanie FASTA"],
+["bio","Powtórka biologii","Campbell, fiszki","Skrypt: FASTA → zawartość GC"],
+["alg","Wstęp do bioinformatyki, wyszukiwanie wzorców w sekwencjach","Lesk","Notebooki Langmeada"],
+["alg","Programowanie dynamiczne, odległość edycyjna","Lesk","Notebooki Langmeada"],
+["alg","Dopasowanie globalne, macierze substytucji","Lesk","Notebooki Langmeada"],
+["alg","Dopasowanie lokalne, kary za przerwy","Lesk","Dopasowanie liczone ręcznie"],
+["alg","BLAST i wartość E","Lesk","BLAST na NCBI; projekt: pobranie sekwencji FOXP2"],
+["alg","Indeksy k-merów, mapowanie odczytów","Slajdy Langmeada","Notebooki Langmeada"],
+["alg","Dopasowanie wielosekwencyjne (MSA)","Lesk","Projekt FOXP2"],
+["alg","Składanie genomów","Slajdy Langmeada","Notebooki Langmeada"],
+["alg","Powtórka algorytmów","Notatki, fiszki","–"],
+["data","Budowa i organizacja genomu","Brown","Kaggle SQL"],
+["data","Sekwencjonowanie NGS, plik FASTQ","Brown","Kaggle SQL; projekt: dopasowanie w MAFFT"],
+["data","Mapowanie (SAM/BAM), warianty (VCF)","Wrangling Genomics","Wrangling Genomics"],
+["data","Bazy NCBI, ENA, UniProt, PDB, Ensembl; formaty GFF i PDB","Lesk","Pobranie genu, białka i struktury"],
+["evo","Mechanizmy ewolucji: mutacje, dobór, dryf","Campbell, Brown","R for Data Science"],
+["evo","Homologia, ortologi i paralogi, ewolucja genomów","Brown","R for Data Science"],
+["evo","Drzewa: UPGMA, NJ, ML, bootstrap","Brown (opcjonalnie Higgs i Attwood)","Projekt: drzewo w IQ-TREE"],
+["evo","Genomika porównawcza, zegar molekularny","Brown","Projekt: drzewo narysowane w R"],
+["rev","Powtórka: biologia i biochemia","Lista pytań","–"],
+["rev","Powtórka: algorytmy i dane","Lista pytań","Projekt: README"],
+["rev","Powtórka: ewolucja i informatyka","Lista pytań","Projekt gotowy na GitHubie"],
+["rev","Bufor na zaległości","–","–"],
+["int","Próbna rozmowa nr 1","Lista pytań","–"],
+["int","Poprawa słabych punktów, odpowiedzi na głos","Notatki","–"],
+["int","Próbna rozmowa nr 2, wypowiedź o motywacji (2 min), projekt (5 min)","–","–"],
+["int","Lekki tydzień i rozmowa (w 2026 była 22–24 lipca; termin na 2027 sprawdź wiosną)","–","–"]
+];
+const LINKS={
+ "Missing Semester":"https://missing.csail.mit.edu/2026/",
+ "Shell for Genomics":"https://datacarpentry.github.io/shell-genomics/",
+ "Kaggle Python":"https://www.kaggle.com/learn/python",
+ "Kaggle SQL":"https://www.kaggle.com/learn/intro-to-sql",
+ "Notebooki Langmeada":"https://github.com/BenLangmead/ads1-notebooks",
+ "Slajdy Langmeada":"https://github.com/BenLangmead/ads1-slides",
+ "Wrangling Genomics":"https://datacarpentry.github.io/wrangling-genomics/",
+ "R for Data Science":"https://r4ds.hadley.nz/",
+ "Stryer":"https://www.ncbi.nlm.nih.gov/books/NBK21154/",
+ "Brown":"https://www.ncbi.nlm.nih.gov/books/NBK21128/"
+};
+const START=new Date(2026,10,9);
+const DAY=864e5;
+const MONTHS=["listopad 2026","grudzień 2026","styczeń 2027","luty 2027","marzec 2027","kwiecień 2027","maj 2027","czerwiec 2027","lipiec 2027"];
+let done={}; let sel=0;
+
+function weekOf(d){const i=Math.floor((d-START)/DAY/7);return (i>=0&&i<W.length)?i:-1}
+function fmt(d){return d.toLocaleDateString("pl-PL",{day:"numeric",month:"short"})}
+function esc(s){return s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))}
+function linkify(s){let h=esc(s);for(const k in LINKS){if(h.includes(k)){h=h.replace(k,`<a href="${LINKS[k]}" target="_blank" rel="noopener">${k}</a>`);}}return h}
+
+function buildLegend(){document.getElementById("legend").innerHTML=Object.entries(PH).map(([k,v])=>`<li class="${k}">${v}</li>`).join("")}
+
+function buildMonths(){
+  const box=document.getElementById("months");const today=new Date();today.setHours(0,0,0,0);
+  let html="";
+  for(let m=0;m<9;m++){
+    const y=m<2?2026:2027, mo=(10+m)%12;
+    const first=new Date(y,mo,1), n=new Date(y,mo+1,0).getDate();
+    const lead=(first.getDay()+6)%7;
+    html+=`<section class="month"><h3>${MONTHS[m]}</h3><div class="grid">`+["pn","wt","śr","cz","pt","sb","nd"].map(d=>`<div class="dow">${d}</div>`).join("");
+    for(let i=0;i<lead;i++)html+=`<span></span>`;
+    for(let d=1;d<=n;d++){
+      const dt=new Date(y,mo,d), w=weekOf(dt);
+      const cls=["day"]; if(w>=0)cls.push("in",W[w][0]); if(+dt===+today)cls.push("today");
+      html+=w>=0?`<button type="button" class="${cls.join(" ")}" data-w="${w}" aria-label="${d} ${MONTHS[m]}, tydzień ${w+1}">${d}</button>`:`<span class="${cls.join(" ")}">${d}</span>`;
+    }
+    html+=`</div></section>`;
+  }
+  box.innerHTML=html;
+  box.addEventListener("click",e=>{const b=e.target.closest("button.day");if(b){sel=+b.dataset.w;render()}});
+}
+
+function buildTable(){
+  const cw=currentWeek();
+  document.getElementById("tbody").innerHTML=W.map(([ph,topic,read,it],i)=>{
+    const s=new Date(+START+i*7*DAY),e=new Date(+s+6*DAY);
+    return `<tr class="wk ${ph}${i===cw?" now":""}" data-w="${i}"><td class="num">${i+1}</td><td class="dates">${fmt(s)} – ${fmt(e)}</td><td><span class="chip ${ph}">${PH[ph]}</span></td><td class="topic">${esc(topic)}</td><td>${linkify(read)}</td><td>${linkify(it)}</td><td class="ck"><input type="checkbox" aria-label="Tydzień ${i+1} zaliczony" data-w="${i}"></td></tr>`}).join("");
+  const tb=document.getElementById("tbody");
+  tb.addEventListener("change",e=>{const c=e.target.closest("input[data-w]");if(c)toggle(+c.dataset.w,c.checked)});
+  tb.addEventListener("click",e=>{if(e.target.closest("input,a"))return;const r=e.target.closest("tr.wk");if(r){sel=+r.dataset.w;setView("cal");render()}});
+}
+function setView(v){
+  document.getElementById("calview").hidden=v!=="cal";document.getElementById("tableview").hidden=v!=="tab";
+  document.getElementById("v-cal").setAttribute("aria-pressed",v==="cal");document.getElementById("v-tab").setAttribute("aria-pressed",v==="tab");
+  try{localStorage.setItem("bioinf-view",v)}catch(e){}
+}
+
+function render(){
+  document.querySelectorAll("tr.wk").forEach(r=>{const w=+r.dataset.w,d=!!done["w"+(w+1)];r.classList.toggle("done",d);const c=r.querySelector("input");if(c)c.checked=d});
+  document.querySelectorAll("button.day").forEach(b=>{const w=+b.dataset.w;b.classList.toggle("sel",w===sel);b.classList.toggle("done",!!done["w"+(w+1)])});
+  const n=Object.values(done).filter(Boolean).length;
+  document.getElementById("pcount").textContent=`${n} / ${W.length}`;
+  document.getElementById("pbar").style.width=(n/W.length*100)+"%";
+  const [ph,topic,read,it]=W[sel];
+  const s=new Date(+START+sel*7*DAY), e=new Date(+s+6*DAY);
+  const p=document.getElementById("panel");
+  p.className="panel";
+  p.innerHTML=`<div class="wk-eyebrow"><span class="chip ${ph}">${PH[ph]}</span><span class="wk-dates">Tydzień ${sel+1} · ${fmt(s)} – ${fmt(e)}</span></div>
+  <h2>${esc(topic)}</h2>
+  <dl><div><dt>Temat (ok. 4 h)</dt><dd>${esc(topic)}</dd></div>
+  <div><dt>Czytam</dt><dd>${linkify(read)}</dd></div>
+  <div><dt>Informatyka (ok. 2 h)</dt><dd>${linkify(it)}</dd></div></dl>
+  <label class="check"><input type="checkbox" id="wk-done" ${done["w"+(sel+1)]?"checked":""}> Tydzień zaliczony</label>
+  <div class="nav"><button type="button" id="prev" ${sel===0?"disabled":""}>← Poprzedni</button><button type="button" id="now">Ten tydzień</button><button type="button" id="next" ${sel===W.length-1?"disabled":""}>Następny →</button></div>`;
+  document.getElementById("wk-done").onchange=ev=>toggle(sel,ev.target.checked);
+  document.getElementById("prev").onclick=()=>{if(sel>0){sel--;render()}};
+  document.getElementById("next").onclick=()=>{if(sel<W.length-1){sel++;render()}};
+  document.getElementById("now").onclick=()=>{sel=currentWeek();render()};
+}
+function currentWeek(){const t=new Date();t.setHours(0,0,0,0);const w=weekOf(t);return w>=0?w:(t<START?0:W.length-1)}
+
+function saveLocal(){try{localStorage.setItem("bioinf-done",JSON.stringify(done))}catch(e){}}
+function loadLocal(){try{const v=JSON.parse(localStorage.getItem("bioinf-done")||"{}");if(v&&typeof v==="object")done=v}catch(e){}}
+
+// --- synchronizacja z GitHubem (plik progress.json w repozytorium strony) ---
+const REPO=(()=>{const h=location.hostname,p=location.pathname.split("/").filter(Boolean);
+  if(h.endsWith(".github.io"))return {owner:h.replace(".github.io",""),repo:p[0]||h};return {owner:"zczarneckait-tech",repo:"bioinf"}})();
+const API=`https://api.github.com/repos/${REPO.owner}/${REPO.repo}/contents/progress.json`;
+let token=null, sha=null, pushTimer=null;
+try{token=localStorage.getItem("bioinf-gh-token")}catch(e){}
+function setState(t){const el=document.getElementById("syncstate");if(el)el.textContent=t}
+function hdrs(){return {"Authorization":"Bearer "+token,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"}}
+async function pull(){
+  if(!token){setState("Postęp zapisany w tej przeglądarce.");return}
+  setState("Synchronizuję…");
+  try{
+    const r=await fetch(API+"?t="+Date.now(),{headers:hdrs(),cache:"no-store"});
+    if(r.status===404){sha=null;await push();return}
+    if(r.status===401||r.status===403){setState("Klucz nie działa. Sprawdź go w Synchronizacji.");return}
+    if(!r.ok)throw new Error(r.status);
+    const j=await r.json();sha=j.sha;
+    const v=JSON.parse(decodeURIComponent(escape(atob(j.content.replace(/\n/g,"")))));
+    if(v&&v.done&&typeof v.done==="object"){done={...v.done};saveLocal();render()}
+    setState("Zsynchronizowano z GitHubem.");
+  }catch(e){setState("Brak połączenia z GitHubem, postęp zapisany w tej przeglądarce.")}
+}
+async function push(){
+  if(!token)return;
+  setState("Zapisuję…");
+  const body={message:"Postęp nauki",content:btoa(unescape(encodeURIComponent(JSON.stringify({done,updated:new Date().toISOString()},null,1))))};
+  if(sha)body.sha=sha;
+  try{
+    const r=await fetch(API,{method:"PUT",headers:{...hdrs(),"Content-Type":"application/json"},body:JSON.stringify(body)});
+    if(r.status===409||r.status===422){const g=await fetch(API+"?t="+Date.now(),{headers:hdrs(),cache:"no-store"});if(g.ok){sha=(await g.json()).sha;return push()}}
+    if(r.status===401||r.status===403){setState("Klucz nie ma uprawnień do zapisu. Sprawdź go w Synchronizacji.");return}
+    if(!r.ok)throw new Error(r.status);
+    sha=(await r.json()).content.sha;setState("Zapisano na GitHubie.");
+  }catch(e){setState("Nie udało się zapisać na GitHubie, postęp został w tej przeglądarce.")}
+}
+function toggle(i,val){
+  done={...done,["w"+(i+1)]:val};render();saveLocal();
+  clearTimeout(pushTimer);pushTimer=setTimeout(push,800);
+}
+function openSync(o){document.getElementById("syncpanel").hidden=!o;if(o)document.getElementById("tok").focus()}
+document.getElementById("syncbtn").onclick=()=>openSync(document.getElementById("syncpanel").hidden);
+document.getElementById("tok-close").onclick=()=>openSync(false);
+document.getElementById("tok-save").onclick=async()=>{
+  const v=document.getElementById("tok").value.trim();const m=document.getElementById("tokmsg");
+  if(!v){m.textContent="Wklej klucz z GitHuba.";return}
+  token=v;try{localStorage.setItem("bioinf-gh-token",v)}catch(e){}
+  m.textContent="Łączę…";await pull();m.textContent=document.getElementById("syncstate").textContent;
+  document.getElementById("tok").value="";
+};
+document.getElementById("tok-del").onclick=()=>{token=null;sha=null;try{localStorage.removeItem("bioinf-gh-token")}catch(e){}document.getElementById("tokmsg").textContent="Odłączono. Postęp zostaje w tej przeglądarce.";setState("Postęp zapisany w tej przeglądarce.")};
+
+loadLocal();buildLegend();buildMonths();buildTable();sel=currentWeek();
+document.getElementById("v-cal").onclick=()=>setView("cal");
+document.getElementById("v-tab").onclick=()=>setView("tab");
+try{if(localStorage.getItem("bioinf-view")==="tab")setView("tab")}catch(e){}
+render();
+
+pull();
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull()});
+</script>
+</body>
+</html>
